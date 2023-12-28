@@ -29,5 +29,14 @@ services:
       db:
         condition: service_healthy
 
+  nginx:
+    image: nginx:1.25.3-alpine
+    volumes:
+      - ./nginx:/etc/nginx/
+    ports:
+      - "10080:80"
+    depends_on:
+      - backend
+
 volumes:
   chatdb:

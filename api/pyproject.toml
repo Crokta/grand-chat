@@ -31,6 +31,8 @@ pyotp = "^2.9.0"
 cuid2 = "^2.0.0"
 gunicorn = "^21.2.0"
 daphne = "^4.0.0"
+psycopg2-binary = "^2.9.9"
+django-jazzmin = "^2.6.0"
 
 
 [build-system]
