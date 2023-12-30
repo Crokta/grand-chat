@@ -42,3 +42,10 @@ class Message(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages', null=True)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Outbox(models.Model):
+    method = models.TextField(default="publish")
+    payload = models.JSONField()
+    partition = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)

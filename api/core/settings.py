@@ -68,9 +68,9 @@ ASGI_APPLICATION = 'core.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'chat',
-        'USER': 'chat',
-        'PASSWORD': 'chat',
+        'NAME': 'grandchat',
+        'USER': 'grandchat',
+        'PASSWORD': 'grandchat',
         'HOST': 'db',
         'PORT': '5432',
     }
@@ -117,3 +117,7 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CENTRIFUGO_TOKEN_SECRET is used to create connection and subscription JWT.
+CENTRIFUGO_TOKEN_SECRET = 'secret'
+CENTRIFUGO_HTTP_API_KEY = 'api_key'

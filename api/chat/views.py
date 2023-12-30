@@ -1,7 +1,6 @@
 from django.db import transaction
 from django.db.models import OuterRef, Exists, Count
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.mixins import ListModelMixin
@@ -10,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
+from .mixins import CentrifugoMixin
 from .models import Room, RoomMember, Message
 from .serializers import RoomSearchSerializer, MessageSerializer, RoomMemberSerializer
 
@@ -37,7 +37,7 @@ class RoomListViewSet(ListModelMixin, GenericViewSet):
         )
 
 
-class MessageListCreateAPIView(ListCreateAPIView):
+class MessageListCreateAPIView(ListCreateAPIView, CentrifugoMixin):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
 
@@ -57,16 +57,24 @@ class MessageListCreateAPIView(ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         obj = serializer.save(room=room, user=request.user)
         room.last_message = obj
-        room.bumped_at = timezone.now()
         room.save()
+
+        # This is where we add code to broadcast over Centrifugo API.
+        broadcast_payload = {
+            'channels': channels,
+            'data': {
+                'type': 'message_added',
+                'body': serializer.data
+            },
+            'idempotency_key': f'message_{serializer.data["id"]}'
+        }
+        self.broadcast_room(room_id, broadcast_payload)
+
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-    def get_room_member_channels(self, room_id):
-        return []
 
-
-class JoinRoomView(APIView):
+class JoinRoomView(APIView, CentrifugoMixin):
     permission_classes = [IsAuthenticated]
 
     @transaction.atomic
@@ -75,14 +83,25 @@ class JoinRoomView(APIView):
         room.increment_version()
         if RoomMember.objects.filter(user=request.user, room=room).exists():
             return Response({"message": "already a member"}, status=status.HTTP_409_CONFLICT)
+
         obj, _ = RoomMember.objects.get_or_create(user=request.user, room=room)
         channels = self.get_room_member_channels(room_id)
         obj.room.member_count = len(channels)
         body = RoomMemberSerializer(obj).data
+
+        broadcast_payload = {
+            'channels': channels,
+            'data': {
+                'type': 'user_joined',
+                'body': body
+            },
+            'idempotency_key': f'user_joined_{obj.pk}'
+        }
+        self.broadcast_room(room_id, broadcast_payload)
         return Response(body, status=status.HTTP_200_OK)
 
 
-class LeaveRoomView(APIView):
+class LeaveRoomView(APIView, CentrifugoMixin):
     permission_classes = [IsAuthenticated]
 
     @transaction.atomic
@@ -95,7 +114,13 @@ class LeaveRoomView(APIView):
         pk = obj.pk
         obj.delete()
         body = RoomMemberSerializer(obj).data
+        broadcast_payload = {
+            'channels': channels,
+            'data': {
+                'type': 'user_left',
+                'body': body
+            },
+            'idempotency_key': f'user_left_{pk}'
+        }
+        self.broadcast_room(room_id, broadcast_payload)
         return Response(body, status=status.HTTP_200_OK)
-
-    def get_room_member_channels(self, room_id):
-        return []

@@ -1,5 +1,9 @@
 import json
+import time
 
+import jwt
+
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
@@ -34,3 +38,34 @@ def logout_view(request):
 
     logout(request)
     return JsonResponse({})
+
+
+def get_connection_token(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'unauthorized'}, status=401)
+
+    token_claims = {
+        'sub': str(request.user.pk),
+        'exp': int(time.time()) + 120
+    }
+    token = jwt.encode(token_claims, settings.CENTRIFUGO_TOKEN_SECRET)
+
+    return JsonResponse({'token': token})
+
+
+def get_subscription_token(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'unauthorized'}, status=401)
+
+    channel = request.GET.get('channel')
+    if channel != f'personal:{request.user.pk}':
+        return JsonResponse({'detail': 'permission denied'}, status=403)
+
+    token_claims = {
+        'sub': str(request.user.pk),
+        'exp': int(time.time()) + 300,
+        'channel': channel
+    }
+    token = jwt.encode(token_claims, settings.CENTRIFUGO_TOKEN_SECRET)
+
+    return JsonResponse({'token': token})
