@@ -29,6 +29,19 @@ services:
       db:
         condition: service_healthy
 
+  frontend:
+    stdin_open: true
+    build: ./frontend
+    volumes:
+      - ./frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
+
   nginx:
     image: nginx:1.25.3-alpine
     volumes:
